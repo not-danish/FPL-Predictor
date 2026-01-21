@@ -23,7 +23,7 @@ for page in range(42):
         ],
         
         "inputs": [
-            {"id": "input-year", "property": "value", "value": "2024_25"},
+            {"id": "input-year", "property": "value", "value": "2025_26"},
             {"id": "input-team-stats", "property": "value", "value": "0"},
             {"id": "input-position-team-stats", "property": "value", "value": [3,5,2,1,4]},
             {"id": "input-price-stats", "property": "value", "value": [0,16]},
@@ -62,7 +62,7 @@ for page in range(42):
         break
 
     # Save only the data list
-    with open(f"page_{page+1}.json", "w") as f:
+    with open(f"data2526_{page+1}.json", "w") as f:
         json.dump(table_rows, f, indent=2)
 
     print(f"Saved page {page+1} (rows: {len(table_rows)})")
