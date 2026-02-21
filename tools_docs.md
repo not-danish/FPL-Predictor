@@ -85,7 +85,15 @@ most_vice_captained_player_id: The player ID of the most vice-captained player i
 
 9. **fpl_league_standings**: Look-up the current standings of a specific FPL League.
 
-
+## Outputs:
+- gw_points: Total points scored by the team in the current gameweek
+- fpl_manager_name: Name of the FPL team manager
+- current_rank: Current rank of the team in the league
+- last_rank: The team's rank in the previous gameweek
+- fpl_total_points: Total points scored by the team in all gameweeks so far
+- fpl_team_id: Unique identifier for the FPL team
+- fpl_team_name: Name of the team
+- movement: Change in rank from the previous gameweek (positive means moved up, negative means moved down)
 
 
 
