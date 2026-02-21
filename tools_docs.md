@@ -95,12 +95,18 @@ most_vice_captained_player_id: The player ID of the most vice-captained player i
 - fpl_team_name: Name of the team
 - movement: Change in rank from the previous gameweek (positive means moved up, negative means moved down)
 
-
+-------------------------------
 
 10. **most_valuable_fpl_teams**: Look-up the most valuable FPL teams right now (current season).
 
+## Outputs:
+    - fpl_team_id: Unique identifier for the team
+    - fpl_team_name: Name of the team
+    - fpl_manager_name: Name of the team manager
+    - value_with_bank: Current value of the team. Includes the bank value of the team as well. The value is in millions (e.g., a value of 1050 means the team is worth 105 million).
+    - total_transfers: Total number of transfers made by the team in the season so far
 
-
+-------------------------------
 
 
 11. **my_fpl_team_players**: Look-up the players in a user's FPL team.
