@@ -1,3 +1,11 @@
+## List of Helper Functions
+get_player_name_from_id
+get_team_name_from_id
+
+
+
+
+
 ## List of Tools in the System
 
 1. **team_data**:  Latest football team-level performance data for teams in the English Premier League (EPL).
@@ -5,33 +13,31 @@
 ### Outputs:
 name, position, short_name, strength_overall_home, stength_overall_away, strength_attack_home, strength_sttack_away, strength_defence_home, strength_defence_away, pulse_id
 
--------------------------------
-
-2. **get_player_name_from_id**: Look-up the name of a player in the EPL given player ID
 
 -------------------------------
 
-3. **fpl_scoring_rules**: Look-up the latest scoring rules for FPL given their position (GKP, DEF, MID, TWD)
+2. **fpl_scoring_rules**: Look-up the latest scoring rules for FPL given their position (GKP, DEF, MID, TWD)
 
 ## Outputs:
 long_play, short_play, goals_conceded, goals_scored, assists, clean_sheets, penalties_saved, penalties_missed, yellow_cards, red_cards, own_goals, defensive_contribution
 
 -------------------------------
 
-4. **player_types**: Look-up the different player types/positions in FPL.
+3. **player_types**: Look-up the different player types/positions in FPL.
 
 ## Outputs:
 position_code, squad_select, squad_min_select, squad_max_select, squad_min_play, squad_max_play, sub_positions_locked, element_count
 
 -------------------------------
 
-5. **fixture_info_for_gw**: Look-up the latest match information for a specific gameweek in the EPL.
+4. **fixture_info_for_gw**: Look-up the latest match information for a specific gameweek in the EPL.
 
 ## Outputs:
 event, finished, fixture_id, kickoff_time, minutes, started, team_a, team_a_score, team_h, team_h_score, team_h_difficulty, team_a_difficulty
 
+-------------------------------
 
-6. **fixture_stats**:
+5. **fixture_stats**:
 Inputs: fixture_id, stat
 look-up specific stats for a specific fixture in the English Premier League (EPL).
 
@@ -44,7 +50,7 @@ player_id, stat_name
 
 -------------------------------
 
-7. **current_gw_status**: Look-up the current gw number and live status of the gw.
+6. **current_gw_status**: Look-up the current gw number and live status of the gw.
 
 ## Outputs:
 bonus_added: if bonus points have been applied for that gw
@@ -55,7 +61,7 @@ points
 -------------------------------
 
 
-8. **fpl_gw_info**: Look-up latest info about a specific gw in the EPL.
+7. **fpl_gw_info**: Look-up latest info about a specific gw in the EPL.
 
 ## Outputs: 
 gameweek: The ID of the gameweek (e.g., 1, 2, 3, etc.).
@@ -83,7 +89,7 @@ most_vice_captained_player_id: The player ID of the most vice-captained player i
 -------------------------------
 
 
-9. **fpl_league_standings**: Look-up the current standings of a specific FPL League.
+8. **fpl_league_standings**: Look-up the current standings of a specific FPL League.
 
 ## Outputs:
 - gw_points: Total points scored by the team in the current gameweek
@@ -97,7 +103,7 @@ most_vice_captained_player_id: The player ID of the most vice-captained player i
 
 -------------------------------
 
-10. **most_valuable_fpl_teams**: Look-up the most valuable FPL teams right now (current season).
+9. **most_valuable_fpl_teams**: Look-up the most valuable FPL teams right now (current season).
 
 ## Outputs:
     - fpl_team_id: Unique identifier for the team
@@ -109,11 +115,22 @@ most_vice_captained_player_id: The player ID of the most vice-captained player i
 -------------------------------
 
 
-11. **my_fpl_team_players**: Look-up the players in a user's FPL team.
+10. **fpl_team_players**: Look-up the players in a user's FPL team.
+
+## Outputs:
+– player_id
+– squad_position
+– captain_multiplier
+– is_captain
+– is_vice_captain
+– player_position
+– player_name
+– team_name
+
+-------------------------------
+PLAYER SPECIFIC TOOLS
 
 
 
 
-
-
-12. **python_repl_tool**: Create and execute python code
+11. **python_repl_tool**: Create and execute python code
