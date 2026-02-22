@@ -154,7 +154,16 @@ PLAYER SPECIFIC TOOLS
 – value: The value of the player in the fixture, which is the player's price at the time of the fixture. This value is in millions (e.g., a value of 105 means the player was worth 10.5 million at the time of the fixture).
 – points: The total FPL points scored by the player for their performance in the fixture, calculated based on the various stats and the FPL scoring rules.
 
+12. **player_upcoming_fixtures**: look-up the upcoming fixtures for a specific player in the English Premier League (EPL).
 
+## Outputs:
+- player_id: The ID of the player in the English Premier League (EPL).
+- player_name: The name of the player in the English Premier League (EPL).
+- fixture_id: The ID of the upcoming fixture/match that the player is scheduled to play in.
+– team_h: The name of the home team in the upcoming fixture.
+– team_a: The name of the away team in the upcoming fixture.
+– gw: The gameweek number in which the upcoming fixture is scheduled to take place.
+– kickoff_time: The scheduled kickoff time for the upcoming fixture in ISO 8601 format
 
 
 12. **python_repl_tool**: Create and execute python code
