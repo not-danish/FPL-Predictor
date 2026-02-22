@@ -130,7 +130,31 @@ most_vice_captained_player_id: The player ID of the most vice-captained player i
 -------------------------------
 PLAYER SPECIFIC TOOLS
 
+11. **player_stats_by_fixture**: look-up the irl stats of a specific player in the English Premier League (EPL) for each fixture they have played in this season.
+
+## Outputs:
+– player_id: The ID of the player in the English Premier League (EPL).
+– player_name: The name of the player in the English Premier League (EPL).
+– fixture_id: The ID of the fixture/match in which the player played.
+– opponent_team: The name of the opponent team that the player faced in the fixture.
+– gw: The gameweek number in which the fixture took place.
+– minutes: The number of minutes the player played in the fixture.
+– goals_scored: The number of goals scored by the player in the fixture.
+– assists: The number of assists made by the player in the fixture.
+– clean_sheets: The number of clean sheets kept by the player in the fixture (only applicable for goalkeepers and defenders).
+– goals_conceded: The number of goals conceded by the player in the fixture (only applicable for goalkeepers and defenders).
+– own_goals: The number of own goals scored by the player in the fixture.
+– penalties_saved: The number of penalties saved by the player in the fixture (only applicable for goalkeepers).
+– penalties_missed: The number of penalties missed by the player in the fixture.
+– yellow_cards: The number of yellow cards received by the player in the fixture.
+– red_cards: The number of red cards received by the player in the fixture.
+– saves: The number of saves made by the player in the fixture (only applicable for goalkeepers).
+– bonus: The number of bonus points awarded to the player for their performance in the fixture.
+– bps: The Bonus Point System score for the player in the fixture, which is a metric used in FPL to determine bonus points based on various performance factors.
+– value: The value of the player in the fixture, which is the player's price at the time of the fixture. This value is in millions (e.g., a value of 105 means the player was worth 10.5 million at the time of the fixture).
+– points: The total FPL points scored by the player for their performance in the fixture, calculated based on the various stats and the FPL scoring rules.
 
 
 
-11. **python_repl_tool**: Create and execute python code
+
+12. **python_repl_tool**: Create and execute python code
