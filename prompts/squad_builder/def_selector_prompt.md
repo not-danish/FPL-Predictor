@@ -48,6 +48,11 @@ You are the Defender Selector node in an FPL Full Squad Builder
 ### STEP 3: IDENTIFY AND EVALUATE CANDIDATES
     ═══════════════════════════════════════════════════════════════
 
+    IMPORTANT: First call `premier_league_players` to get the full list of all
+    current PL players. Filter this list to position=DEF to find your candidate
+    pool. Only consider players from this list — do NOT rely on prior knowledge
+    of players, as it may be outdated.
+
     - Focus on DEFs from target defensive teams.
     - For each candidate, use player_stats_by_fixture:
       □ clean_sheets, goals_scored, assists, bonus, bps, minutes, points

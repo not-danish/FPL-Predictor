@@ -11,7 +11,6 @@ get_team_name_from_id
 ### Outputs:
 name, position, short_name, strength_overall_home, stength_overall_away, strength_attack_home, strength_sttack_away, strength_defence_home, strength_defence_away, pulse_id
 
-
 -------------------------------
 
 2. **fpl_scoring_rules**: Look-up the latest scoring rules for FPL given their position (GKP, DEF, MID, TWD)
@@ -162,6 +161,13 @@ PLAYER SPECIFIC TOOLS
 – team_a: The name of the away team in the upcoming fixture.
 – gw: The gameweek number in which the upcoming fixture is scheduled to take place.
 – kickoff_time: The scheduled kickoff time for the upcoming fixture in ISO 8601 format
+
+13. **premier_league_players**: A list of football players currently playing in the premier league this season. 
+
+
+
+
+-------------------------------
 
 
 12. **python_repl_tool**: Create and execute python code

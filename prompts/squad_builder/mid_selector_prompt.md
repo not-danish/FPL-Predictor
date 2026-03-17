@@ -50,6 +50,11 @@ You are the Midfielder Selector node in an FPL Full Squad Builder
 ### STEP 3: IDENTIFY AND EVALUATE CANDIDATES
     ═══════════════════════════════════════════════════════════════
 
+    IMPORTANT: First call `premier_league_players` to get the full list of all
+    current PL players. Filter this list to position=MID to find your candidate
+    pool. Only consider players from this list — do NOT rely on prior knowledge
+    of players, as it may be outdated.
+
     - Focus on MIDs from target attacking teams.
     - Check fpl_gw_info for most_selected, most_captained_player_id,
       most_transferred_in — these are often premium MIDs.
