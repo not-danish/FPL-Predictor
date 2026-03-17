@@ -63,4 +63,7 @@
     - STRATEGIC ISSUES: [list of players with non-urgent but notable concerns]
     - REASONING: [detailed explanation]
 
+    At the very end of your response, include EXACTLY one routing tag with the total number of
+    transfers recommended (e.g., [TRANSFERS: 0], [TRANSFERS: 1], [TRANSFERS: 2]).
+
     Respond ONLY with the transfer strategy. Do NOT recommend specific players.

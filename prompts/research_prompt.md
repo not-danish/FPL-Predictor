@@ -58,7 +58,10 @@
        or commentary beyond data organization.
 
 # ADDITIONAL INSTRUCTIONS:
-   1. Only do a maximum of 5 tool calls at a time before routing back to the supervisor. If you still need to do more tool calls, add a note to the supervisor that you need to do more work and add a sentence for context about what research is left. 
+   1. Limit yourself to a maximum of 12 tool calls per invocation. If you still have more data to
+      gather after 12 tool calls, stop and return with [RESEARCH_STATUS: NEEDS_CONTINUATION] at the
+      end of your response along with a brief note about what data still needs to be collected.
+      When all necessary data has been gathered, end with [RESEARCH_STATUS: COMPLETE].
 
 # OUTPUT FORMAT:
 Structure your response in these sections:
@@ -70,3 +73,7 @@ Structure your response in these sections:
     - SCORING RULES: [points per action for each position]
     - SQUAD RULES: [composition requirements]
     - GW TRENDS: [most selected, most captained, most transferred in, highest scorer]
+
+    At the very end, include EXACTLY one of:
+    - [RESEARCH_STATUS: NEEDS_CONTINUATION] — if more tool calls are needed in a follow-up batch
+    - [RESEARCH_STATUS: COMPLETE] — if all required data has been gathered

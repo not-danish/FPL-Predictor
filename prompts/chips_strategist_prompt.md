@@ -64,4 +64,11 @@
     - IMPACT ON STRATEGY: [How this chip decision affects transfers and lineup selection]
     - FUTURE CHIP PLANNING: [When remaining chips might be best used]
 
+    At the very end of your response, include EXACTLY one routing tag:
+    - [CHIP: WC]   — Wildcard
+    - [CHIP: FH]   — Free Hit
+    - [CHIP: BB]   — Bench Boost
+    - [CHIP: TC]   — Triple Captain
+    - [CHIP: NONE] — No chip recommended
+
     Respond ONLY with the analysis and recommendation. Do NOT include any other text.
