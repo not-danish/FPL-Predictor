@@ -11,9 +11,7 @@
 
       a) CURRENT GAMEWEEK CONTEXT:
           - Use current_gw_status to determine the current GW number and its live status.
-          - Use fpl_gw_info to get detailed info about the current and next GW
-            (deadline_time, average_entry_score, most_selected, most_captained_player_id,
-            most_transferred_in, highest_scoring_player_id).
+          - Do NOT call fpl_gw_info — you do not have this tool.
 
       b) MY SQUAD:
           - Use fpl_team_players to get the user's current squad.
@@ -26,11 +24,15 @@
           - Focus on: minutes, goals_scored, assists, clean_sheets, bonus, bps, points, value.
           - Calculate recent form: average points over the last 5 gameweeks.
 
-      d) UPCOMING FIXTURES:
-          - For each player in the user's squad, use player_upcoming_fixtures to get
-            their next 5-6 fixtures.
-          - Use fixture_info_for_gw to get fixture difficulty ratings (team_h_difficulty,
-            team_a_difficulty) for the next GW.
+      d) UPCOMING FIXTURES (CRITICAL — must use real tool data, not memory):
+          - Call fixture_info_for_gw for EACH of the next 6 GWs starting from the current/next GW.
+            For example if the next GW is 31, call fixture_info_for_gw(31), fixture_info_for_gw(32),
+            fixture_info_for_gw(33), fixture_info_for_gw(34), fixture_info_for_gw(35), fixture_info_for_gw(36).
+            Each call returns which teams are playing, the difficulty ratings, and explicitly flags
+            BLANK GAMEWEEK teams (no fixture that GW) and DOUBLE GAMEWEEK teams (two fixtures that GW).
+            Record blank/double GW information for every team — this is critical for chip and transfer strategy.
+          - Additionally, for each player in the user's squad, use player_upcoming_fixtures to get
+            their individual fixture schedule with blank/double GW flags.
 
       e) TEAM DATA:
           - Use team_data to get all team strength ratings (strength_overall_home,
