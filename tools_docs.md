@@ -1,6 +1,7 @@
 ## List of Helper Functions
 get_player_name_from_id
 get_team_name_from_id
+get_player_team: get the name of the team that a player plays for based on the player_id
 
 
 
