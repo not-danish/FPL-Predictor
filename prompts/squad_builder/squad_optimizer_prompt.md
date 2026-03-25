@@ -128,4 +128,10 @@ CAPTAINCY CANDIDATES (top 3):
 2. [Name] — [reason]
 3. [Name] — [reason]
 
+VALIDATION SUMMARY:
+- Composition: [X] GKP | [X] DEF | [X] MID | [X] FWD
+- Squad cost: £[X.X]m / £[budget]m
+- Club distribution: [Team1]: [X], [Team2]: [X], ... (list all clubs with 2+ players)
+- Formation: [X-X-X] (valid FPL formation)
+
 Respond ONLY with this output.
