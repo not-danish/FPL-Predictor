@@ -157,6 +157,54 @@ def fixture_info_for_gw(gw: Annotated[int, "The FPL gameweek number."]) -> str:
     return df.to_markdown()
 
 @tool
+def get_team_fixtures(
+    team_name: Annotated[str, "Exact team name as shown in FPL data, e.g. 'Chelsea', 'Man Utd', 'Nott'm Forest'."],
+    num_gws: Annotated[int, "Number of upcoming gameweeks to show (1-6)."] = 3,
+) -> str:
+    """Get a team's upcoming fixtures with opponents, home/away, and FDR
+    pre-computed. Use this instead of parsing raw fixture_info_for_gw output."""
+    # Find the team's id
+    teams_df = pd.DataFrame(data["teams"])
+    match = teams_df[teams_df["name"] == team_name]
+    if match.empty:
+        # Try case-insensitive partial match
+        match = teams_df[teams_df["name"].str.lower().str.contains(team_name.lower())]
+    if match.empty:
+        return f"Team '{team_name}' not found. Available teams: {', '.join(teams_df['name'].tolist())}"
+    team_id = int(match.iloc[0]["id"])
+
+    # Find next GW
+    events_df = pd.DataFrame(data["events"])
+    next_rows = events_df[events_df["is_next"] == True]
+    if next_rows.empty:
+        return "Could not determine next gameweek."
+    next_gw = int(next_rows.iloc[0]["id"])
+
+    # Fetch fixtures for each upcoming GW
+    rows = []
+    for gw in range(next_gw, next_gw + min(num_gws, 6)):
+        url = f"https://fantasy.premierleague.com/api/fixtures/?event={gw}"
+        fix = json.loads(_cached_get(url))
+        for f in fix:
+            if f["team_h"] == team_id:
+                opp = get_team_name_from_id(f["team_a"])
+                rows.append({"GW": gw, "opponent": opp, "venue": "H",
+                             "FDR": f.get("team_h_difficulty", "?")})
+            elif f["team_a"] == team_id:
+                opp = get_team_name_from_id(f["team_h"])
+                rows.append({"GW": gw, "opponent": opp, "venue": "A",
+                             "FDR": f.get("team_a_difficulty", "?")})
+
+    if not rows:
+        return f"No upcoming fixtures found for {team_name}."
+
+    result_df = pd.DataFrame(rows)
+    avg_fdr = result_df["FDR"].mean()
+    lines = [f"**{team_name}** — next {len(rows)} fixtures (avg FDR: {avg_fdr:.1f}):"]
+    lines.append(result_df.to_markdown(index=False))
+    return "\n".join(lines)
+
+@tool
 def fixture_stats(
     fixture_id: Annotated[int, "The fixture ID."],
     stat: Annotated[str, "One of: goals_scored, assists, own_goals, penalties_saved, penalties_missed, yellow_cards, red_cards, saves, bonus, bps, defensive_contribution"]
@@ -407,6 +455,74 @@ def premier_league_players(
         return f"No players found for position={position}, max_price={max_price}"
     return df.to_markdown()
 
+@tool
+def get_top_form_players(
+    position: Annotated[str, "Position filter: GKP, DEF, MID, or FWD."],
+    max_price: Annotated[float, "Hard budget cap in millions (e.g. 5.8). No player above this price will be returned."],
+    top_n: Annotated[int, "Number of top candidates to return (default 15)."] = 15,
+    min_minutes_per_gw: Annotated[float, "Minimum average minutes per GW to filter non-starters (default 45)."] = 45,
+) -> str:
+    """Return the top N players by current FPL form rating for a given position
+    and budget, sorted best-to-worst. Use this INSTEAD OF premier_league_players
+    as your starting shortlist — it surfaces candidates from all teams ranked by
+    form, not alphabetically by team.
+
+    Each row includes:
+    - player_id, player_name, team_name, price
+    - form: FPL rolling form score (weighted recent pts/GW)
+    - pts_per_game: season average pts/GW
+    - total_points: season total
+    - minutes: season minutes played
+    - goals_scored, assists, clean_sheets (season totals)
+    - selected_by_percent: ownership %
+
+    After getting this list, call get_player_summary(player_id) for the top
+    candidates to get per-GW breakdown and fixture data.
+    """
+    df = pd.DataFrame(data["elements"])
+    pos_map = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
+    df["position_name"] = df["element_type"].map(pos_map)
+    df = df[df["position_name"] == position]
+
+    df["price"] = df["now_cost"] / 10
+    df = df[df["price"] <= max_price]
+
+    # Filter out non-starters by average minutes per GW played
+    df["form"] = pd.to_numeric(df["form"], errors="coerce").fillna(0)
+    df["minutes"] = pd.to_numeric(df["minutes"], errors="coerce").fillna(0)
+
+    # Calculate avg minutes per GW (use games played as proxy from minutes/90)
+    df["gws_played"] = (df["minutes"] / 90).clip(lower=1)
+    df["avg_min_per_gw"] = df["minutes"] / df["gws_played"].clip(lower=1)
+    df = df[df["avg_min_per_gw"] >= min_minutes_per_gw]
+
+    if df.empty:
+        return f"No players found for position={position}, max_price={max_price}m with avg ≥{min_minutes_per_gw} min/GW."
+
+    df = df.sort_values("form", ascending=False).head(top_n)
+
+    df["team_name"] = df["team"].apply(get_team_name_from_id)
+    df["player_name"] = df["first_name"] + " " + df["second_name"]
+    df["pts_per_game"] = pd.to_numeric(df["points_per_game"], errors="coerce").fillna(0)
+
+    keep = ["player_id" if "player_id" in df.columns else "id",
+            "player_name", "team_name", "price", "form",
+            "pts_per_game", "total_points", "minutes",
+            "goals_scored", "assists", "clean_sheets", "selected_by_percent"]
+    # id column is named "id" in bootstrap
+    df = df.rename(columns={"id": "player_id"})
+    keep = [c for c in ["player_id", "player_name", "team_name", "price", "form",
+                        "pts_per_game", "total_points", "minutes",
+                        "goals_scored", "assists", "clean_sheets",
+                        "selected_by_percent"] if c in df.columns]
+    result = df[keep].reset_index(drop=True)
+    lines = [
+        f"Top {len(result)} {position} players by FPL form (≤ £{max_price}m, avg ≥ {min_minutes_per_gw} min/GW):",
+        result.to_markdown(index=False),
+    ]
+    return "\n".join(lines)
+
+
 repl = PythonREPL()
 
 @tool
@@ -429,7 +545,8 @@ def get_player_summary(player_id: Annotated[int, "The EPL player ID."]) -> str:
     raw = json.loads(_cached_get(url))
 
     player_name = get_player_name_from_id(player_id)
-    lines = [f"**{player_name}** (ID: {player_id})"]
+    player_team = get_player_team(player_id)
+    lines = [f"**{player_name}** (ID: {player_id}) | Team: {player_team}"]
 
     # ── Recent form: last 6 GWs only, key columns only ────────────────────────
     history = raw.get("history", [])
@@ -532,12 +649,97 @@ def get_user_team(
                 return "OK"
             df["next_gw"] = df["team"].apply(_status)
 
-    # Compact output: drop player_id, is_captain, is_vice_captain
-    keep = ["slot", "pos", "name", "team", "cap_mult"]
+    # Include player_id so downstream agents can call get_player_summary
+    keep = ["slot", "player_id", "pos", "name", "team", "cap_mult"]
     if "next_gw" in df.columns:
         keep.append("next_gw")
     lines.append("\n**Squad:**")
     lines.append(df[keep].to_markdown(index=False))
+    return "\n".join(lines)
+
+
+@tool
+def get_squad_club_counts(
+    user_id: Annotated[int, "The user's FPL team ID."],
+    gw: Annotated[int, "Current or most recent FINISHED gameweek number."],
+    transfer_out: Annotated[str, "Name of the player being sold (or empty string if none)."] = "",
+    transfer_in: Annotated[str, "Name of the player being bought (or empty string if none)."] = "",
+) -> str:
+    """Get club-by-club player counts for a squad, optionally applying a
+    proposed transfer. Use this to verify the 3-per-club limit."""
+    url = f"https://fantasy.premierleague.com/api/entry/{user_id}/event/{gw}/picks/"
+    raw = json.loads(_cached_get(url))
+    if "picks" not in raw:
+        return f"No team data for user_id={user_id}, gw={gw}."
+
+    elements = {e["id"]: e for e in data["elements"]}
+    teams_map = {t["id"]: t["name"] for t in data["teams"]}
+    pos_map = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
+
+    squad = []
+    for p in raw["picks"]:
+        el = elements.get(p["element"])
+        if not el:
+            continue
+        squad.append({
+            "name": el.get("web_name", el["second_name"]),
+            "full_name": (el.get("first_name", "") + " " + el.get("second_name", "")).strip(),
+            "team": teams_map.get(el["team"], "Unknown"),
+            "pos": pos_map.get(el["element_type"], "UNK"),
+        })
+
+    # Apply transfer if specified
+    transfer_note = ""
+    if transfer_out:
+        out_lower = transfer_out.lower()
+        removed = False
+        for i, s in enumerate(squad):
+            if out_lower in s["full_name"].lower() or out_lower in s["name"].lower():
+                transfer_note += f"OUT: {s['name']} ({s['team']}, {s['pos']})\n"
+                squad.pop(i)
+                removed = True
+                break
+        if not removed:
+            transfer_note += f"⚠️ Could not find '{transfer_out}' in squad to remove.\n"
+
+    if transfer_in:
+        # Find the incoming player in bootstrap data
+        in_lower = transfer_in.lower()
+        in_el = None
+        for e in data["elements"]:
+            full = (e.get("first_name", "") + " " + e.get("second_name", "")).lower()
+            web = e.get("web_name", "").lower()
+            if in_lower == web or in_lower == full or in_lower in full or in_lower in web:
+                in_el = e
+                break
+        if in_el:
+            in_team = teams_map.get(in_el["team"], "Unknown")
+            in_pos = pos_map.get(in_el["element_type"], "UNK")
+            squad.append({"name": in_el.get("web_name", ""), "team": in_team, "pos": in_pos})
+            transfer_note += f"IN: {in_el.get('web_name', '')} ({in_team}, {in_pos})\n"
+        else:
+            transfer_note += f"⚠️ Could not find '{transfer_in}' in player database.\n"
+
+    # Count by club
+    club_counts = Counter(s["team"] for s in squad)
+    # Count by position
+    pos_counts = Counter(s["pos"] for s in squad)
+
+    lines = []
+    if transfer_note:
+        lines.append(f"TRANSFER APPLIED:\n{transfer_note}")
+    lines.append("CLUB COUNTS (after transfer):")
+    for club, count in sorted(club_counts.items()):
+        players_at_club = [s["name"] for s in squad if s["team"] == club]
+        flag = " ❌ EXCEEDS LIMIT" if count > 3 else ""
+        lines.append(f"  {club}: {count} [{', '.join(players_at_club)}]{flag}")
+
+    violations = [c for c, n in club_counts.items() if n > 3]
+    lines.append(f"\nPOSITION COUNTS: {dict(pos_counts)}")
+    if violations:
+        lines.append(f"\n❌ CLUB LIMIT VIOLATED: {', '.join(violations)}")
+    else:
+        lines.append("\n✅ All clubs ≤ 3 players.")
     return "\n".join(lines)
 
 
@@ -621,28 +823,62 @@ llm_fast = ChatOpenAI(
 # ── Context compression utilities ─────────────────────────────────────────────
 
 def make_pre_model_hook(keep_last_n: int = 20):
-    def _remove_orphaned_tool_messages(msgs):
-        valid_ids = set()
-        for m in msgs:
-            if isinstance(m, AIMessage):
-                for tc in getattr(m, "tool_calls", []):
-                    valid_ids.add(tc["id"])
-        return [m for m in msgs
-                if not (isinstance(m, ToolMessage) and m.tool_call_id not in valid_ids)]
+    """
+    Trim the message list to the last ~keep_last_n messages, but NEVER split an
+    AIMessage-with-tool-calls from its corresponding ToolMessage results.
+    Splitting those pairs causes the model to forget its results and retry the
+    same tool calls in an infinite loop.
+    """
+    def _group_turns(msgs):
+        """Group messages into complete turns: each turn is either a single
+        non-tool message, or an AIMessage-with-tool-calls + ALL its ToolMessages."""
+        turns = []
+        i = 0
+        while i < len(msgs):
+            msg = msgs[i]
+            if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+                tc_ids = {tc["id"] for tc in msg.tool_calls}
+                turn = [msg]
+                j = i + 1
+                while j < len(msgs) and isinstance(msgs[j], ToolMessage) \
+                        and msgs[j].tool_call_id in tc_ids:
+                    turn.append(msgs[j])
+                    j += 1
+                turns.append(turn)
+                i = j
+            else:
+                turns.append([msg])
+                i += 1
+        return turns
 
     def _hook(state: dict) -> dict:
         messages = state.get("messages", [])
         system_msgs = [m for m in messages if isinstance(m, SystemMessage)]
-        non_system = [m for m in messages if not isinstance(m, SystemMessage)]
+        non_system  = [m for m in messages if not isinstance(m, SystemMessage)]
+
         if len(non_system) <= keep_last_n:
-            return {"llm_input_messages": _remove_orphaned_tool_messages(system_msgs + non_system)}
+            return {"llm_input_messages": system_msgs + non_system}
+
+        turns = _group_turns(non_system)
+
+        # Walk backwards through turns, accumulating until we exceed keep_last_n
+        kept_turns = []
+        total = 0
+        for turn in reversed(turns):
+            if total + len(turn) > keep_last_n and kept_turns:
+                break
+            kept_turns.insert(0, turn)
+            total += len(turn)
+
+        recent_msgs = [m for turn in kept_turns for m in turn]
+
+        # Always preserve the first HumanMessage so the agent knows its task
         first_human = next((m for m in non_system if isinstance(m, HumanMessage)), None)
-        recent = non_system[-keep_last_n:]
         kept = system_msgs[:]
-        if first_human and first_human not in recent:
+        if first_human and first_human not in recent_msgs:
             kept.append(first_human)
-        kept.extend(recent)
-        return {"llm_input_messages": _remove_orphaned_tool_messages(kept)}
+        kept.extend(recent_msgs)
+        return {"llm_input_messages": kept}
 
     return _hook
 
@@ -681,59 +917,60 @@ def build_graph():
             model=llm,
             tools=[fpl_league_standings, get_user_team, most_valuable_fpl_teams, python_repl_tool],
             prompt=f.read(), name="rival_analyst",
-            pre_model_hook=make_pre_model_hook(keep_last_n=3),
+            pre_model_hook=make_pre_model_hook(keep_last_n=15),
         )
 
     with open("prompts/fixture_analyst_prompt.md") as f:
         fixture_analyst_agent = create_react_agent(
             model=llm,
-            tools=[fixture_info_for_gw, get_player_summary, team_data, python_repl_tool],
+            tools=[fixture_info_for_gw, team_data, get_team_fixtures],
             prompt=f.read(), name="fixture_analyst",
-            pre_model_hook=make_pre_model_hook(keep_last_n=3),
+            pre_model_hook=make_pre_model_hook(keep_last_n=20),
         )
 
     with open("prompts/chips_strategist_prompt.md") as f:
         chips_strategy_agent = create_react_agent(
             model=llm,
             tools=[get_gameweek_context, get_user_team, fixture_info_for_gw,
-                   get_player_summary, python_repl_tool],
+                   get_player_summary, get_team_fixtures],
             prompt=f.read(), name="chips_strategist",
-            pre_model_hook=make_pre_model_hook(keep_last_n=3),
+            pre_model_hook=make_pre_model_hook(keep_last_n=15),
         )
 
     with open("prompts/transfers_agents/transfers_prompt.md") as f:
         transfers_agent = create_react_agent(
             model=llm,
-            tools=[get_user_team, get_gameweek_context, python_repl_tool],
+            tools=[get_user_team, get_gameweek_context, get_player_summary],
             prompt=f.read(), name="transfers_agent",
-            pre_model_hook=make_pre_model_hook(keep_last_n=3),
+            pre_model_hook=make_pre_model_hook(keep_last_n=10),
         )
 
     with open("prompts/transfers_agents/outgoing_recommender_prompt.md") as f:
         outgoing_recommender = create_react_agent(
             model=llm,
             tools=[get_player_summary, get_user_team,
-                   fixture_info_for_gw, fpl_scoring_rules, python_repl_tool],
+                   get_team_fixtures, fpl_scoring_rules],
             prompt=f.read(), name="outgoing_recommender",
-            pre_model_hook=make_pre_model_hook(keep_last_n=3),
+            pre_model_hook=make_pre_model_hook(keep_last_n=40),
         )
 
     with open("prompts/transfers_agents/incoming_recommender_prompt.md") as f:
         incoming_recommender = create_react_agent(
             model=llm,
             tools=[get_player_summary, team_data,
-                   fpl_scoring_rules, player_types, fixture_info_for_gw,
-                   premier_league_players, get_user_team, python_repl_tool],
+                   fpl_scoring_rules, player_types,
+                   premier_league_players, get_top_form_players, get_user_team,
+                   get_team_fixtures, get_squad_club_counts],
             prompt=f.read(), name="incoming_recommender",
-            pre_model_hook=make_pre_model_hook(keep_last_n=5),
+            pre_model_hook=make_pre_model_hook(keep_last_n=20),
         )
 
     with open("prompts/constraint_validator_prompt.md") as f:
         constraint_validator = create_react_agent(
             model=llm_fast,
-            tools=[python_repl_tool, get_user_team, get_gameweek_context],
+            tools=[get_user_team, get_gameweek_context, get_squad_club_counts],
             prompt=f.read(), name="constraint_validator",
-            pre_model_hook=make_pre_model_hook(keep_last_n=5),
+            pre_model_hook=make_pre_model_hook(keep_last_n=15),
         )
 
     with open("prompts/lineup_selector_prompt.md") as f:
@@ -741,7 +978,7 @@ def build_graph():
             model=llm_fast,
             tools=[fixture_info_for_gw, get_player_summary, get_user_team, python_repl_tool],
             prompt=f.read(), name="lineup_selector",
-            pre_model_hook=make_pre_model_hook(keep_last_n=5),
+            pre_model_hook=make_pre_model_hook(keep_last_n=20),
         )
 
     with open("prompts/captaincy_selector_prompt.md") as f:
@@ -749,7 +986,7 @@ def build_graph():
             model=llm,
             tools=[fixture_info_for_gw, get_player_summary, python_repl_tool],
             prompt=f.read(), name="captaincy_selector",
-            pre_model_hook=make_pre_model_hook(keep_last_n=3),
+            pre_model_hook=make_pre_model_hook(keep_last_n=15),
         )
 
     with open("prompts/final_reviewer_prompt.md") as f:
@@ -757,7 +994,7 @@ def build_graph():
             model=llm,
             tools=[python_repl_tool, get_user_team, get_gameweek_context],
             prompt=f.read(), name="final_reviewer",
-            pre_model_hook=make_pre_model_hook(keep_last_n=5),
+            pre_model_hook=make_pre_model_hook(keep_last_n=30),
         )
 
     # Squad builder sub-agents
@@ -885,7 +1122,18 @@ def build_graph():
         return {"validation_status": status, "validation_retries": retries}
 
     def sync_after_analysis(state):
-        return {}
+        # Runs after parallel rival/fixture branches join — do compression here
+        # to avoid both branches racing to RemoveMessage the same IDs.
+        to_remove = []
+        for msg in state["messages"]:
+            msg_id = getattr(msg, "id", None)
+            if not msg_id:
+                continue
+            if isinstance(msg, ToolMessage):
+                to_remove.append(RemoveMessage(id=msg_id))
+            elif isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+                to_remove.append(RemoveMessage(id=msg_id))
+        return {"messages": to_remove} if to_remove else {}
 
     # ── Routing ───────────────────────────────────────────────────────────────
 
@@ -917,8 +1165,14 @@ def build_graph():
         status = state.get("validation_status", "UNKNOWN")
         retries = state.get("validation_retries", 0)
         if status == "VALID":
-            return "lineup_selector" if state.get("pipeline") == "full" else END
-        if retries >= 3:
+            pipeline = state.get("pipeline", "full")
+            if pipeline == "full":
+                return "lineup_selector"
+            elif pipeline == "transfers":
+                return "final_reviewer"
+            else:
+                return END
+        if retries >= 2:
             return "final_reviewer"
         return state.get("validation_path", "incoming_recommender")
 
@@ -951,8 +1205,8 @@ def build_graph():
     g.add_node("set_incoming_path", set_incoming_path)
     g.add_node("sync_analysis",     sync_after_analysis)
 
-    for name in ["compress_research", "compress_rival",
-                 "compress_fixtures", "compress_chips", "compress_squad",
+    for name in ["compress_research",
+                 "compress_chips", "compress_squad",
                  "compress_transfers", "compress_outgoing", "compress_incoming",
                  "compress_validation", "compress_lineup", "compress_captaincy"]:
         g.add_node(name, compress_messages)
@@ -966,10 +1220,10 @@ def build_graph():
                             ["rival_analyst", "fixture_analyst",
                              "lineup_selector", "captaincy_selector", END])
 
-    g.add_edge("rival_analyst",   "compress_rival")
-    g.add_edge("fixture_analyst", "compress_fixtures")
-    g.add_edge("compress_rival",    "sync_analysis")
-    g.add_edge("compress_fixtures", "sync_analysis")
+    # Both parallel branches converge directly at sync_analysis, which handles
+    # compression in one shot to avoid RemoveMessage collision on the same IDs.
+    g.add_edge("rival_analyst",   "sync_analysis")
+    g.add_edge("fixture_analyst", "sync_analysis")
     g.add_edge("sync_analysis",     "chips_strategist")
 
     g.add_edge("chips_strategist", "update_chip")

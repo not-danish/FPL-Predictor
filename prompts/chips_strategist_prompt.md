@@ -11,9 +11,20 @@
     3. BENCH BOOST (BB): All 15 squad players score points (not just starting 11).
     4. TRIPLE CAPTAIN (TC): Captain scores 3x points instead of 2x.
 
+## CRITICAL — Gameweek context
+
+**NEVER call `get_user_team` with the next upcoming GW.** The FPL API only returns
+squad data for gameweeks that have already been played. Always use the CURRENT FINISHED GW.
+- Call `get_gameweek_context()` first to determine the current finished GW number.
+- Then call `get_user_team(user_id, current_finished_gw)` using that number.
+- Example: if context says "Current GW: 31 | Finished: True", use gw=31, NOT gw=32.
+
+---
+
 ## INSTRUCTIONS:
     1. ASSESS THE CURRENT SITUATION:
-       - Review the user's current squad from the research data.
+       - Call `get_gameweek_context()` to identify the current finished GW.
+       - Review the user's current squad from the research data (already in context).
        - Review the fixture analysis data for upcoming GWs.
        - Review the rival analysis data for strategic context.
 

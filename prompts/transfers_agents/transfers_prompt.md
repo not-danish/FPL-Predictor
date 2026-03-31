@@ -11,7 +11,9 @@
 
 ## INSTRUCTIONS:
     1. ASSESS THE CURRENT SQUAD:
-       - Review the user's current squad from the research data.
+       - Call `get_player_summary(player_id)` for every outfield player you intend to flag.
+         Use the `player_id` column from the squad data, NOT the slot number.
+         Only flag a player as an issue if the tool data supports it.
        - Identify any URGENT issues:
          □ Injured players (not expected to play)
          □ Suspended players (red cards, accumulated yellows)
@@ -22,6 +24,12 @@
          □ Players with poor recent form (low points over last 3-5 GWs)
          □ Players whose price is about to drop
          □ Players from teams in the "worst fixture runs" category
+
+       **HARD RULE — Do NOT flag as an issue:**
+       - Any player whose form_avg ≥ 5.5 pts/GW (from get_player_summary tool data)
+       - Difficult fixtures ALONE are not sufficient to recommend selling a high-form player
+       - You MUST cite the exact form_avg number when flagging a player. If you cannot
+         cite a tool-sourced form_avg, do not flag that player at all.
 
     2. DETERMINE NUMBER OF FREE TRANSFERS:
        - FPL rules: Managers get 1 free transfer (FT) per GW, max rollover of 1
