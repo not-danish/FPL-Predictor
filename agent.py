@@ -976,7 +976,7 @@ def build_graph():
     with open("prompts/lineup_selector_prompt.md") as f:
         lineup_selector = create_react_agent(
             model=llm_fast,
-            tools=[fixture_info_for_gw, get_player_summary, get_user_team, python_repl_tool],
+            tools=[get_player_summary, get_user_team, get_team_fixtures],
             prompt=f.read(), name="lineup_selector",
             pre_model_hook=make_pre_model_hook(keep_last_n=20),
         )
@@ -984,7 +984,7 @@ def build_graph():
     with open("prompts/captaincy_selector_prompt.md") as f:
         captaincy_selector = create_react_agent(
             model=llm,
-            tools=[fixture_info_for_gw, get_player_summary, python_repl_tool],
+            tools=[get_player_summary, get_team_fixtures],
             prompt=f.read(), name="captaincy_selector",
             pre_model_hook=make_pre_model_hook(keep_last_n=15),
         )
@@ -992,7 +992,7 @@ def build_graph():
     with open("prompts/final_reviewer_prompt.md") as f:
         final_reviewer = create_react_agent(
             model=llm,
-            tools=[python_repl_tool, get_user_team, get_gameweek_context],
+            tools=[get_user_team, get_gameweek_context],
             prompt=f.read(), name="final_reviewer",
             pre_model_hook=make_pre_model_hook(keep_last_n=30),
         )

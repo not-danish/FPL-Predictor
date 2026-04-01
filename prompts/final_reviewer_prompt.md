@@ -63,10 +63,13 @@ If no transfers were recommended, use the current squad as-is.
 
 ## STEP 4 — Pick starting XI and bench
 
-From the post-transfer squad, pick:
-- Best starting 11 (sensible formation: 4-3-3, 4-4-2, 3-4-3, etc.)
-- Bench: GKP sub + 3 outfield ordered by likelihood to play
-- Captain: highest-form attacking player with good GW fixture (from captaincy_selector output if present, else pick yourself)
+Use the lineup from `lineup_selector` output (already in the conversation). If lineup_selector ran:
+- Use the exact formation and player order it chose
+- Use the captain and VC from `captaincy_selector` output
+
+If lineup_selector did NOT run (transfers-only pipeline):
+- Pick the best starting 11 using a sensible formation (4-3-3, 4-4-2, 3-4-3, etc.)
+- Captain: highest-form attacking player with good GW fixture
 - VC: second-best option, different club from captain where possible
 - Never output "[None selected]" — always name a player
 
@@ -86,6 +89,9 @@ For the starting 11, estimate: form × fixture_multiplier × minutes_probability
 1. Output ONLY the formatted block below — no preamble, no echoing of prior agents' text, no `[PIPELINE: ...]` tags, no `[RESEARCH_STATUS: ...]` tags.
 2. Every claim must include numbers from tool data. When explaining WHY a transfer is recommended, cite the player's actual form_avg and fixture FDRs.
 3. The `OUT: [Player] (£X.Xm) → IN: [Player] (£X.Xm)` line is MANDATORY for the squad visualization to work. Never omit it if a transfer was recommended.
+4. The `[LINEUP_START]...[LINEUP_END]` block at the very end is MANDATORY every time. The UI uses it to render the pitch visualization. Never omit it.
+
+---
 
 ## FINAL OUTPUT FORMAT (follow exactly, no extra commentary)
 
@@ -102,17 +108,18 @@ For the starting 11, estimate: form × fixture_multiplier × minutes_probability
 💰 Remaining ITB: £X.Xm | Hits: [N × -4pts / None]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 YOUR TEAM (GW[N])
+📋 SUGGESTED LINEUP (GW[N])
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Formation X-X-X]
+Formation: [X-X-X]
+
 GKP: [Player] vs [Opp] (FDR X)
-DEF: [Player] | [Player] | [Player] [| ...]
-MID: [Player] | [Player] | [Player] [| ...]
-FWD: [Player] | [Player] [| ...]
+DEF: [Player] | [Player] | [Player] [| Player 4 | Player 5]
+MID: [Player] | [Player] | [Player] [| Player 4 | Player 5]
+FWD: [Player] | [Player] [| Player 3]
 
 👑 C: [Player] | VC: [Player]
 
-BENCH: [GKP] | [DEF/MID/FWD] | [DEF/MID/FWD] | [DEF/MID/FWD]
+BENCH: [GKP] | [sub1] | [sub2] | [sub3]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 xPts: ~[XX] (with captain: ~[XX])
@@ -121,6 +128,38 @@ BENCH: [GKP] | [DEF/MID/FWD] | [DEF/MID/FWD] | [DEF/MID/FWD]
 ⚠️ [Risk 2 if any]
 
 💡 WHY:
-- [Transfer rationale citing actual form_avg and FDR numbers, e.g. "Selling X (form_avg 2.1, FDR 4,5,4) for Y (form_avg 6.3, FDR 2,2,3)"]
-- [Captain rationale citing form and fixture, e.g. "C has form_avg 7.2 vs FDR 2 (home)"]
+- [Transfer rationale citing actual form_avg and FDR numbers]
+- [Captain rationale citing form and fixture]
+```
+
+Then, **after all of the above**, output the machine-readable lineup block. This block must always be present — even if no lineup was produced by lineup_selector, reconstruct one from the post-transfer squad.
+
+Use the player's exact FPL web name (e.g. "Salah", "Alexander-Arnold", "Mbeumo") — not full names.
+Each row is comma-separated. No spaces around commas. Captain and VC must be single names matching a starter.
+
+```
+[LINEUP_START]
+FORMATION:X-X-X
+GKP:web_name
+DEF:web_name1,web_name2,web_name3
+MID:web_name1,web_name2,web_name3
+FWD:web_name1,web_name2
+CAPTAIN:web_name
+VC:web_name
+BENCH:web_name1,web_name2,web_name3,web_name4
+[LINEUP_END]
+```
+
+Example (4-3-3 formation):
+```
+[LINEUP_START]
+FORMATION:4-3-3
+GKP:Raya
+DEF:Alexander-Arnold,Saliba,Pedro Porro,Mykolenko
+MID:Salah,Mbeumo,Schär
+FWD:Watkins,Isak,Havertz
+CAPTAIN:Salah
+VC:Mbeumo
+BENCH:Flekken,Mykolenko,Janelt,Welbeck
+[LINEUP_END]
 ```
