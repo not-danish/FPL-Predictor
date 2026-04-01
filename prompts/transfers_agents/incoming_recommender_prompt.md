@@ -14,7 +14,8 @@ MUST come from tool output. Players transfer between clubs; your training data i
 
 ## STEP 0 — Build the exclusion list (MANDATORY FIRST STEP)
 
-Call `get_user_team(user_id, current_finished_gw)` immediately.
+Call `get_user_team(user_id=<user_id>, gw=<current_finished_gw>)` immediately.
+**IMPORTANT:** The second parameter MUST be named `gw`, not `current_finished_gw`.
 
 Write out ALL 15 squad players by name as an exclusion list:
 
@@ -34,12 +35,12 @@ If a player is in the exclusion list, they are already owned — buying them aga
 
 ## STEP 1 — Identify all outgoing players and their budgets
 
-From the outgoing_recommender output, identify EVERY SELL block. There may be 1 or 2.
+Scan the conversation history for lines that begin with `SELL:` — these are output by the outgoing_recommender. There will be exactly 1 or 2 such blocks. If you see none, look for the most recent message from the agent named `outgoing_recommender` and find the player names it flagged.
 
-For each sell, record:
+For each SELL block, record:
 - `transfer_N_out`: the player being sold (name and position)
-- `sell_price_N`: their selling price
-- `position_N`: their position (DEF/MID/FWD — copy from outgoing_recommender output)
+- `sell_price_N`: the value on the `SELLING PRICE:` line
+- `position_N`: the position in parentheses on the `SELL:` line (DEF/MID/FWD)
 
 The `itb` (in-the-bank) comes from `get_user_team` output (bank balance).
 

@@ -818,7 +818,16 @@ llm = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     openai_api_key=os.getenv("OPENAI"),
     temperature=0.9,
-    max_tokens=1500,
+    max_tokens=2000,
+)
+
+# High-output model for final_reviewer — needs room for full analysis + lineup block
+llm_reviewer = ChatOpenAI(
+    model="gpt-4o-mini",
+    base_url="https://openrouter.ai/api/v1",
+    openai_api_key=os.getenv("OPENAI"),
+    temperature=0.3,
+    max_tokens=4000,
 )
 
 # Faster, cheaper model for mechanical agents (validation, routing, lineup ordering)
@@ -972,7 +981,7 @@ def build_graph():
                    premier_league_players, get_top_form_players, get_user_team,
                    get_team_fixtures, get_squad_club_counts],
             prompt=f.read(), name="incoming_recommender",
-            pre_model_hook=make_pre_model_hook(keep_last_n=20),
+            pre_model_hook=make_pre_model_hook(keep_last_n=35),
         )
 
     with open("prompts/constraint_validator_prompt.md") as f:
@@ -1001,10 +1010,10 @@ def build_graph():
 
     with open("prompts/final_reviewer_prompt.md") as f:
         final_reviewer = create_react_agent(
-            model=llm,
+            model=llm_reviewer,
             tools=[get_user_team, get_gameweek_context, get_player_summary, get_team_fixtures],
             prompt=f.read(), name="final_reviewer",
-            pre_model_hook=make_pre_model_hook(keep_last_n=50),
+            pre_model_hook=make_pre_model_hook(keep_last_n=60),
         )
 
     # Squad builder sub-agents

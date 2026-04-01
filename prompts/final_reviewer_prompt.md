@@ -69,11 +69,16 @@ Apply all recommended transfers mentally and use the result as the post-transfer
 
 ---
 
-## STEP 5 — xPts estimate
+## STEP 5 — Fetch form data for STARTING XI
 
-Use only **form_avg** values already in the conversation (from prior agent outputs or your own `get_player_summary` calls). Do NOT invent form_avg.
+**MANDATORY:** For every player in the starting XI whose form_avg is NOT explicitly stated in a prior agent's output, call `get_player_summary(player_id)` now to fetch it. Do this BEFORE writing the STARTING XI table.
 
-Simple estimate per starter: form_avg × fixture_multiplier
+To find the player_id: use the `player_id` column from `get_user_team` output, OR search prior agent outputs for references to the player.
+
+Do not write [N/A] — always call the tool instead. [N/A] is only acceptable if the tool itself returns no form data.
+
+Once you have form_avg for all starters, compute xPts:
+- form_avg × fixture_multiplier
 - FDR ≤ 2 → × 1.3
 - FDR = 3 → × 1.1
 - FDR ≥ 4 → × 0.9
@@ -128,9 +133,9 @@ Search `captaincy_selector` output for `captain_score` values and `ALTERNATIVES 
 ## CRITICAL OUTPUT RULES
 
 1. No preamble, no `[PIPELINE:]` tags, no echoing prior agent text.
-2. Every number must come from tool data or prior agent output. `[N/A]` if genuinely unavailable.
+2. Every number must come from tool data or prior agent output. Call `get_player_summary` if needed — never write `[N/A]` when a tool call could supply the value.
 3. The `🔄 OUT: [Player] → IN: [Player]` line is **MANDATORY** for each transfer (visualization depends on it).
-4. The `[LINEUP_START]...[LINEUP_END]` block at the very end is **MANDATORY** every time.
+4. The `[LINEUP_START]...[LINEUP_END]` block is **MANDATORY** and must appear **immediately after the SUGGESTED LINEUP section** — not at the end. Output it before the long analysis tables so it is never cut off.
 
 ---
 
@@ -162,13 +167,29 @@ FWD: [Player] | [Player] [| ...]
 👑 C: [Player] | VC: [Player]
 
 BENCH: [GKP] | [sub1] | [sub2] | [sub3]
+```
 
+Immediately after the SUGGESTED LINEUP section, output the machine-readable block (use exact FPL web names — e.g. "Salah" not "Mohamed Salah", no spaces around commas):
+
+```
+[LINEUP_START]
+FORMATION:X-X-X
+GKP:web_name
+DEF:web_name1,web_name2,web_name3
+MID:web_name1,web_name2,web_name3
+FWD:web_name1,web_name2
+CAPTAIN:web_name
+VC:web_name
+BENCH:web_name1,web_name2,web_name3,web_name4
+[LINEUP_END]
+```
+
+Then continue with the data analysis:
+
+```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 STARTING XI — FORM & FIXTURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Only include form_avg and FDR values you have confirmed from tool data or prior agents.
-If a player's stats were not fetched earlier in the pipeline, call get_player_summary now.]
-
 | Player        | form_avg | FDR | H/A | xPts est. |
 |---------------|----------|-----|-----|-----------|
 | [GKP]         | X.X      | X   | H/A | X.X       |
@@ -225,23 +246,4 @@ captain_score = (form × 3.0) + (fixture_ease × 2.5) + (home × 1.5) + bonuses
 
 [Captain] last 5 GW pts: [copied from tool]
 [VC] chosen over [3rd]: [cite score difference]
-```
-
----
-
-Then output the machine-readable lineup block (MANDATORY — always present, even for transfers-only queries):
-
-Use exact FPL web names (e.g. "Salah" not "Mohamed Salah"). No spaces around commas.
-
-```
-[LINEUP_START]
-FORMATION:X-X-X
-GKP:web_name
-DEF:web_name1,web_name2,web_name3
-MID:web_name1,web_name2,web_name3
-FWD:web_name1,web_name2
-CAPTAIN:web_name
-VC:web_name
-BENCH:web_name1,web_name2,web_name3,web_name4
-[LINEUP_END]
 ```
