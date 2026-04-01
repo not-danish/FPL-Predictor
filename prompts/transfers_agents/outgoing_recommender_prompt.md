@@ -92,14 +92,19 @@ Use this priority order for players NOT eliminated in Step 4:
 
 ## STEP 6 — Select the sell target(s)
 
-Select exactly as many outgoing players as specified in the transfer plan. If the transfer plan asks for N players but fewer than N survive the Step 4 filter, recommend FEWER transfers (0 or 1) and explain why — do NOT force a high-form player into the sell list just to meet a quota.
+**DECISIVE SELECTION — no extra candidates, no "choose any combination" language.**
 
-If NO players are eligible to sell (all have form_avg ≥ 5.5), output:
+- If the transfer plan specifies N transfers: select the TOP N players by sell priority from the ranked list.
+- If fewer than N players survived the Step 4 filter: recommend FEWER transfers (output only the eligible ones) and explain why — do NOT force a high-form player just to meet a quota.
+- If NO players are eligible (all have form_avg ≥ 5.5): output `NO SELL RECOMMENDED` block below.
+- Output **EXACTLY** as many SELL blocks as transfers you are recommending. No more. Do NOT list extra "honourable mentions" or "alternatively you could sell..." options.
+
+If NO players are eligible to sell:
 ```
 NO SELL RECOMMENDED — all squad players have form_avg ≥ 5.5. Rolling the transfer is recommended.
 ```
 
-For each recommended player that passed the Step 4 filter, output the actual numbers:
+For each recommended sell, output this block:
 
 ```
 SELL: [Player Name] ([Position], [Team — taken from squad data or get_player_summary, NOT from memory])
@@ -119,5 +124,7 @@ SELL REASON: [One sentence referencing the actual numbers above]
 RISK: [One sentence — what you give up by selling]
 BUDGET FREED: £[X.X]m
 ```
+
+If recommending 2 sells, output exactly 2 SELL blocks — no summary paragraph after them, no alternatives list. Stop after the last SELL block.
 
 Respond ONLY with the outgoing transfer recommendations. Do NOT suggest incoming players.

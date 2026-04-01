@@ -32,12 +32,19 @@
          cite a tool-sourced form_avg, do not flag that player at all.
 
     2. DETERMINE NUMBER OF FREE TRANSFERS:
-       - FPL rules: Managers get 1 free transfer (FT) per GW, max rollover of 1
-         (so max 2 FTs).
+       - Call `get_user_team(user_id, current_finished_gw)`.
+       - Read the "Free transfers available" value from the tool output — it is shown directly
+         on the Budget line. Use that number. Do NOT ask the user; do NOT guess.
        - Each additional transfer beyond free transfers costs -4 points (a "hit").
-       - Use the research data to determine how many FTs are available.
 
     3. DECIDE TRANSFER STRATEGY:
+
+       Also check whether the user specified a risk tolerance in the query (look for phrases
+       like "conservative", "low risk", "happy to take a hit", "aggressive", "only if urgent"):
+       - Low / conservative → only recommend hits for genuine emergencies (injury/suspension)
+       - Medium / balanced → recommend a hit if expected gain ≥ 4 pts over 2-3 GWs
+       - High / aggressive → recommend hits more readily (≥ 3 pts expected gain is enough)
+       If no risk preference is stated, default to Medium.
 
        OPTION A: ROLL THE TRANSFER (0 transfers, save FT for next GW)
        - Choose this if: Squad is in good shape, no urgent issues, and having 2 FTs
@@ -48,18 +55,20 @@
          has identifiable weak spots.
 
        OPTION C: TAKE A HIT (-4 or -8 points for extra transfers)
-       - Choose this if: Multiple urgent issues exist (injuries, suspensions),
-         AND the expected point gain from the extra transfer(s) is likely to
-         exceed the -4 cost.
-       - Rule of thumb: A hit is worth it if the incoming player is expected to
-         outscore the outgoing player by 4+ points over the next 2-3 GWs.
+       - Choose this if: Urgent issues exist (injuries, suspensions) AND the expected point
+         gain from the extra transfer(s) exceeds the hit threshold based on risk tolerance
+         (see above).
+       - Cite the specific expected gain vs. hit cost in the reasoning.
 
     4. PROVIDE A CLEAR TRANSFER PLAN:
        - State the number of transfers to make
        - State the number of hits to take (if any)
        - State the total points cost of hits
        - Provide reasoning for the decision
-       - Specify the POSITIONS that need transfers (e.g., "1 MID transfer needed")
+       - Specify the POSITIONS that need transfers — copy the position from the squad data
+         or `get_player_summary` output for each flagged player. Do NOT guess or recall from
+         memory. Example: if the squad data says Cucurella is DEF and Palmer is MID, write
+         "1 DEF, 1 MID" — not "2 DEF".
 
 ## OUTPUT FORMAT:
     - TRANSFER STRATEGY: [Roll / Use FTs / Take Hit]

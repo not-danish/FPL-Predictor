@@ -432,17 +432,12 @@ AGENT_LABELS = {
 _CLARIFY_DEFS = [
     {
         "triggers": ["transfer", "buy", "sell", "bring in", "let go", "who should i get"],
-        "intro":    "A few quick questions to sharpen my transfer advice:",
+        "intro":    "One quick question to sharpen my transfer advice:",
         "questions": [
             {
-                "id":      "free_transfers",
-                "text":    "How many free transfers do you have?",
-                "options": ["1 free transfer", "2 free transfers", "Not sure"],
-            },
-            {
-                "id":      "hit_openness",
-                "text":    "Are you open to taking a points hit?",
-                "options": ["Yes, if it's worth it", "No hits this week", "Only for urgent issues"],
+                "id":      "risk_tolerance",
+                "text":    "How do you feel about taking a points hit for an extra transfer?",
+                "options": ["Avoid hits — only free transfers", "Happy to hit if clearly worth it", "Aggressive — hits don't scare me"],
             },
         ],
     },
@@ -560,16 +555,14 @@ def _find_element_by_name(name: str, elements: list) -> dict | None:
     return None
 
 
-def _squad_pitch_html(uid: int, transfers: list[dict] | None = None,
-                      lineup: dict | None = None) -> str:
-    """Render a pitch visualization.
+def _squad_pitch_html(lineup: dict | None = None) -> str:
+    """Render the agent's suggested lineup as a pitch visualization.
 
-    If `lineup` (parsed from [LINEUP_START]...[LINEUP_END]) is provided, render
-    the suggested lineup with the agent's formation and C/VC choices.
-    Otherwise fall back to the user's current FPL picks from the API.
+    Only renders when `lineup` (parsed from [LINEUP_START]...[LINEUP_END]) is provided.
+    Returns empty string otherwise — never falls back to current FPL picks.
     """
     try:
-        from agent import _cached_get, data as fpl_data
+        from agent import data as fpl_data
 
         elements  = fpl_data["elements"]
         teams_map = {t["id"]: t["name"] for t in fpl_data["teams"]}
@@ -671,50 +664,9 @@ def _squad_pitch_html(uid: int, transfers: list[dict] | None = None,
             )
             label_text = "Suggested Lineup"
 
-        # ── PATH B: Current FPL picks (fallback) ───────────────────────────────
+        # No lineup block from agent — do not fall back to current picks
         else:
-            url   = f"https://fantasy.premierleague.com/api/entry/{uid}/event/{_current_gw(fpl_data)}/picks/"
-            raw   = json.loads(_cached_get(url))
-            picks = raw.get("picks", [])
-            if not picks:
-                return ""
-
-            el_map = {e["id"]: e for e in elements}
-            players = []
-            for pk in picks:
-                el = el_map.get(pk["element"])
-                if not el:
-                    continue
-                team_name = teams_map.get(el.get("team", 0), "")
-                is_out = any(
-                    _find_element_by_name(sw["out"], elements) and
-                    _find_element_by_name(sw["out"], elements)["id"] == pk["element"]
-                    for sw in (transfers or [])
-                )
-                is_in = any(
-                    _find_element_by_name(sw["in"], elements) and
-                    _find_element_by_name(sw["in"], elements)["id"] == pk["element"]
-                    for sw in (transfers or [])
-                )
-                players.append({
-                    "name":   el.get("web_name", "?"),
-                    "team":   team_name,
-                    "pos":    el.get("element_type", 4),
-                    "slot":   pk.get("position", 99),
-                    "is_cap": pk.get("is_captain", False),
-                    "is_vc":  pk.get("is_vice_captain", False),
-                    "is_out": is_out,
-                    "is_in":  is_in,
-                })
-
-            starters = sorted([p for p in players if p["slot"] <= 11], key=lambda x: x["slot"])
-            bench_p  = sorted([p for p in players if p["slot"] > 11],  key=lambda x: x["slot"])
-            gkp_row  = [p for p in starters if p["pos"] == 1]
-            def_row  = [p for p in starters if p["pos"] == 2]
-            mid_row  = [p for p in starters if p["pos"] == 3]
-            fwd_row  = [p for p in starters if p["pos"] == 4]
-            formation_tag = ""
-            label_text = "Current Squad"
+            return ""
 
         # ── Render pitch ────────────────────────────────────────────────────────
         pitch = (
@@ -928,14 +880,7 @@ for _i, _msg in enumerate(st.session_state.messages):
             _hist_lineup  = _parse_lineup_block(_msg["content"])
             _hist_display = _strip_lineup_block(_msg["content"])
             st.markdown(_hist_display)
-            _swaps = _parse_transfers_from_output(_msg["content"])
-            if not _swaps:
-                for _entry in _msg.get("log", []):
-                    if _entry.get("type") == "agent_text":
-                        _swaps = _parse_transfers_from_output(_entry["content"])
-                        if _swaps:
-                            break
-            _pitch = _squad_pitch_html(user_id, transfers=_swaps, lineup=_hist_lineup)
+            _pitch = _squad_pitch_html(lineup=_hist_lineup)
             if _pitch:
                 st.markdown(_pitch, unsafe_allow_html=True)
 
@@ -1157,12 +1102,8 @@ if _user_input:
         if _display_final:
             st.markdown(_display_final)
 
-        # Squad pitch — prefer agent-suggested lineup; fall back to transfer swaps only
-        _swaps = _parse_transfers_from_output(_final_out or "")
-        if not _swaps and _log:
-            _all_text = "\n".join(e["content"] for e in _log if e["type"] == "agent_text")
-            _swaps    = _parse_transfers_from_output(_all_text)
-        _pitch = _squad_pitch_html(user_id, transfers=_swaps, lineup=_lineup_data)
+        # Squad pitch — only show when agent provided a [LINEUP_START] block
+        _pitch = _squad_pitch_html(lineup=_lineup_data)
         if _pitch:
             st.markdown(_pitch, unsafe_allow_html=True)
 

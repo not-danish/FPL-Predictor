@@ -440,6 +440,8 @@ def premier_league_players(
 ) -> str:
     """Look up EPL players. Always filter by position and max_price to avoid large results."""
     df = pd.DataFrame(data["elements"])
+    # Exclude players who have left PL clubs (status='u' = unavailable/departed)
+    df = df[df["status"] != "u"]
     df = df.rename(columns={"id": "player_id", "team": "team_id",
                              "element_type": "position", "now_cost": "price"})
     df["team_name"] = df["team_id"].apply(get_team_name_from_id)
@@ -483,6 +485,9 @@ def get_top_form_players(
     pos_map = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
     df["position_name"] = df["element_type"].map(pos_map)
     df = df[df["position_name"] == position]
+
+    # Filter out players who are no longer at a PL club (status='u' = unavailable/departed)
+    df = df[df["status"] != "u"]
 
     df["price"] = df["now_cost"] / 10
     df = df[df["price"] <= max_price]
@@ -618,7 +623,12 @@ def get_user_team(
     eh = raw.get("entry_history", {})
     bank  = eh.get("bank", 0) / 10
     value = eh.get("value", 0) / 10
-    lines = [f"**Budget** — ITB: £{bank}m | Squad value: £{value}m"]
+
+    # Free transfers for next GW: if 0 transfers were used this GW, they rolled → 2 FTs; else 1 FT
+    prev_transfers = eh.get("event_transfers", 1)
+    free_transfers = 2 if prev_transfers == 0 else 1
+
+    lines = [f"**Budget** — ITB: £{bank}m | Squad value: £{value}m | Free transfers available: {free_transfers}"]
 
     # Squad
     df = pd.json_normalize(raw["picks"])
@@ -992,9 +1002,9 @@ def build_graph():
     with open("prompts/final_reviewer_prompt.md") as f:
         final_reviewer = create_react_agent(
             model=llm,
-            tools=[get_user_team, get_gameweek_context],
+            tools=[get_user_team, get_gameweek_context, get_player_summary, get_team_fixtures],
             prompt=f.read(), name="final_reviewer",
-            pre_model_hook=make_pre_model_hook(keep_last_n=30),
+            pre_model_hook=make_pre_model_hook(keep_last_n=50),
         )
 
     # Squad builder sub-agents
