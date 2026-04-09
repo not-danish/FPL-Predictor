@@ -48,6 +48,29 @@ st.markdown("""
     font-family: inherit !important;
 }
 
+@keyframes agent-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(0,232,122,0.18), 0 0 8px rgba(0,232,122,0.25); }
+    50%       { box-shadow: 0 0 0 5px rgba(0,232,122,0.08), 0 0 18px rgba(0,232,122,0.45); }
+}
+@keyframes agent-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+@keyframes feed-slide-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes insight-glow {
+    0%   { border-left-color: rgba(0,232,122,0.5); }
+    50%  { border-left-color: rgba(0,232,122,0.15); }
+    100% { border-left-color: rgba(0,232,122,0.5); }
+}
+@keyframes score-pop {
+    0%   { transform: scale(0.8); opacity: 0; }
+    60%  { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
@@ -662,7 +685,150 @@ AGENT_LABELS = {
     "lineup_selector":      "Lineup Selector",
     "captaincy_selector":   "Captaincy Selector",
     "final_reviewer":       "Final Review",
+    "pattern_analyst":      "Pattern Analyst",
 }
+
+AGENT_DESCRIPTIONS = {
+    "supervisor":           "Classifying your request…",
+    "researcher":           "Gathering squad & league data…",
+    "rival_analyst":        "Scouting mini-league rivals…",
+    "fixture_analyst":      "Mapping upcoming fixture difficulty…",
+    "pattern_analyst":      "Analysing form trends & xG patterns…",
+    "chips_strategist":     "Evaluating chip strategy…",
+    "squad_builder":        "Building optimal squad…",
+    "transfers_agent":      "Scoring squad & planning transfers…",
+    "outgoing_recommender": "Identifying weakest squad players…",
+    "incoming_recommender": "Searching for best replacements…",
+    "constraint_validator": "Validating transfer legality…",
+    "lineup_selector":      "Choosing best starting XI…",
+    "captaincy_selector":   "Picking captain & vice-captain…",
+    "final_reviewer":       "Compiling final recommendations…",
+}
+
+AGENT_ICONS = {
+    "supervisor":           "🧭",
+    "researcher":           "🔍",
+    "rival_analyst":        "⚔️",
+    "fixture_analyst":      "📅",
+    "pattern_analyst":      "📊",
+    "chips_strategist":     "🃏",
+    "squad_builder":        "🏗️",
+    "transfers_agent":      "📋",
+    "outgoing_recommender": "📤",
+    "incoming_recommender": "📥",
+    "constraint_validator": "✅",
+    "lineup_selector":      "⚽",
+    "captaincy_selector":   "©️",
+    "final_reviewer":       "📝",
+}
+
+
+def _extract_insight(tool_name: str, tool_result: str, agent_name: str) -> str | None:
+    """Extract a short, human-readable insight from a tool result for the live feed."""
+    if not tool_result or len(tool_result) < 20:
+        return None
+
+    try:
+        # Strategy detection from get_squad_transfer_scores
+        if tool_name == "get_squad_transfer_scores":
+            lines = []
+            for line in tool_result.split("\n"):
+                if "STRATEGY DETECTED:" in line:
+                    strategy = line.split("STRATEGY DETECTED:")[-1].strip().strip("#").strip()
+                    lines.append(f"Strategy: {strategy}")
+                elif line.strip().startswith("SELL:"):
+                    sell_info = line.strip().replace("SELL:", "").strip()
+                    # Truncate long sell lines
+                    if len(sell_info) > 60:
+                        sell_info = sell_info[:57] + "…"
+                    lines.append(f"Sell candidate: {sell_info}")
+            if lines:
+                return " · ".join(lines[:3])
+
+            # Fallback: extract budget line
+            for line in tool_result.split("\n"):
+                if "Budget:" in line and "ITB" in line:
+                    return line.strip()[:80]
+
+        # Squad analysis
+        if tool_name == "get_squad_analysis":
+            for line in tool_result.split("\n"):
+                if "Budget" in line and "ITB" in line:
+                    return line.strip().replace("**", "")[:80]
+
+        # Player summary — extract form_avg
+        if tool_name == "get_player_summary":
+            name_line = ""
+            form_line = ""
+            for line in tool_result.split("\n"):
+                if line.startswith("**") and "ID:" in line:
+                    name_line = line.split("|")[0].replace("**", "").strip()
+                if "form_avg" in line and "pts/GW" in line:
+                    form_line = line.strip()
+            if name_line and form_line:
+                return f"{name_line} — {form_line}"
+            if name_line:
+                return f"Analysing {name_line}…"
+
+        # Pattern analysis — extract flagged players
+        if tool_name == "get_player_pattern_analysis":
+            flagged = []
+            in_flagged = False
+            for line in tool_result.split("\n"):
+                if "Flagged Players" in line:
+                    in_flagged = True
+                    continue
+                if in_flagged and line.startswith("- **"):
+                    player = line.split("**")[1] if "**" in line else ""
+                    if player:
+                        flagged.append(player)
+                elif in_flagged and not line.strip().startswith("-"):
+                    break
+            if flagged:
+                return f"Flagged: {', '.join(flagged[:4])}"
+
+        # Top form players
+        if tool_name == "get_top_form_players":
+            for line in tool_result.split("\n"):
+                if line.startswith("Top "):
+                    return line[:80]
+
+        # Team fixtures
+        if tool_name == "get_team_fixtures":
+            for line in tool_result.split("\n"):
+                if line.startswith("**") and "avg FDR" in line:
+                    return line.replace("**", "").strip()[:70]
+
+        # Gameweek context
+        if tool_name == "get_gameweek_context":
+            parts = []
+            for line in tool_result.split("\n"):
+                if "Next GW:" in line:
+                    parts.append(line.split("|")[0].strip())
+                elif "Double" in line:
+                    parts.append(line.strip()[:50])
+                elif "Blank" in line:
+                    parts.append(line.strip()[:50])
+            if parts:
+                return " · ".join(parts[:2])
+
+        # Club counts validation
+        if tool_name == "get_squad_club_counts":
+            for line in tool_result.split("\n"):
+                if "✅" in line:
+                    return "All clubs ≤ 3 players ✓"
+                if "❌" in line:
+                    return line.strip()[:60]
+
+        # User team
+        if tool_name in ("get_user_team", "fpl_team_players"):
+            for line in tool_result.split("\n"):
+                if "Budget" in line and "ITB" in line:
+                    return line.strip().replace("**", "")[:80]
+
+    except Exception:
+        pass
+    return None
 
 # ── Clarifying questions definitions ───────────────────────────────────────────
 _CLARIFY_DEFS = [
@@ -758,6 +924,40 @@ def _parse_transfers_from_output(text: str) -> list[dict]:
 _LINEUP_BLOCK_RE = re.compile(r"\[LINEUP_START\](.*?)\[LINEUP_END\]", re.DOTALL)
 
 
+_LINEUP_PLACEHOLDERS = {
+    "web_name", "web_name1", "web_name2", "web_name3", "web_name4",
+    "player", "player1", "player2", "player3",
+}
+
+def _normalise_lineup_name(raw: str) -> str:
+    """Convert agent-output names to display form.
+    Handles underscore-separated names (e.g. 'joão_pedro_junqueira_de_jesus' → 'João Pedro').
+    Tries to find the FPL web_name (short surname) by matching against bootstrap data.
+    """
+    # If it contains underscores, convert to spaces and title-case first
+    if "_" in raw:
+        raw = raw.replace("_", " ").strip()
+
+    # Skip literal placeholder tokens
+    if raw.lower() in _LINEUP_PLACEHOLDERS:
+        return ""
+
+    # Try to find a matching element and return its web_name (short surname)
+    try:
+        from agent import data as _d
+        nl = raw.lower()
+        for el in _d["elements"]:
+            fn = (el.get("first_name", "") + " " + el.get("second_name", "")).lower().strip()
+            wn = el.get("web_name", "").lower()
+            if nl == wn or nl == fn or (len(nl) > 4 and nl in fn):
+                return el.get("web_name", raw)
+    except Exception:
+        pass
+
+    # Fallback: use the normalised string as-is (title-cased)
+    return raw.title() if raw.islower() else raw
+
+
 def _parse_lineup_block(text: str) -> dict | None:
     """Extract the machine-readable [LINEUP_START]...[LINEUP_END] block from agent output."""
     m = _LINEUP_BLOCK_RE.search(text)
@@ -770,8 +970,13 @@ def _parse_lineup_block(text: str) -> dict | None:
             continue
         key, _, val = line.partition(":")
         key = key.strip().upper()
-        players = [p.strip() for p in val.split(",") if p.strip()]
-        result[key] = players
+        players = []
+        for p in val.split(","):
+            norm = _normalise_lineup_name(p.strip())
+            if norm:
+                players.append(norm)
+        if players:
+            result[key] = players
     # Must have at least GKP + one of DEF/MID/FWD to be valid
     return result if ("GKP" in result and "DEF" in result) else None
 
@@ -783,10 +988,21 @@ def _strip_lineup_block(text: str) -> str:
 
 def _find_element_by_name(name: str, elements: list) -> dict | None:
     nl = name.lower().strip()
+    # Pass 1: exact web_name or full name match (most reliable)
     for el in elements:
         wn = el.get("web_name", "").lower()
         fn = (el.get("first_name", "") + " " + el.get("second_name", "")).lower().strip()
-        if nl == wn or nl == fn or nl in fn or nl in wn:
+        if nl == wn or nl == fn:
+            return el
+    # Pass 2: web_name contains the search string (e.g. "joão pedro" matches "joão pedro junqueira")
+    for el in elements:
+        wn = el.get("web_name", "").lower()
+        if nl in wn and len(nl) >= 4:
+            return el
+    # Pass 3: full name contains the search string (last resort — only for longer names)
+    for el in elements:
+        fn = (el.get("first_name", "") + " " + el.get("second_name", "")).lower().strip()
+        if nl in fn and len(nl) >= 5:
             return el
     return None
 
@@ -889,7 +1105,17 @@ def _squad_pitch_html(lineup: dict | None = None) -> str:
             def_row = _make_row(lineup.get("DEF", []))
             mid_row = _make_row(lineup.get("MID", []))
             fwd_row = _make_row(lineup.get("FWD", []))
-            bench_p = [_resolve_player(n) for n in lineup.get("BENCH", [])]
+
+            # Deduplicate bench — remove anyone already in the starting XI
+            _xi_names = {p["name"].lower() for p in gkp_row + def_row + mid_row + fwd_row}
+            _bench_names_seen: set[str] = set()
+            _bench_deduped: list[str] = []
+            for _bn in lineup.get("BENCH", []):
+                _bk = _bn.lower()
+                if _bk not in _xi_names and _bk not in _bench_names_seen:
+                    _bench_deduped.append(_bn)
+                    _bench_names_seen.add(_bk)
+            bench_p = [_resolve_player(n) for n in _bench_deduped]
 
             # Caption tag showing formation
             formation_tag = (
@@ -984,23 +1210,41 @@ def _parse_md_table(text: str) -> tuple[list[str], list[list[str]]]:
 
 
 def _render_checks_html(content: str) -> str:
-    """Render reality-check lines as colored status cards."""
-    cards = []
+    """Render reality-check lines as a compact horizontal chip strip."""
+    chips = []
     for line in content.strip().splitlines():
         line = line.strip()
         if not line:
             continue
         ok   = line.startswith("✅")
         fail = line.startswith("❌")
-        color  = "#34d399" if ok else ("#f87171" if fail else "#8b8c9e")
-        bg     = "rgba(0,200,100,0.05)" if ok else ("rgba(239,68,68,0.06)" if fail else "transparent")
-        border = "rgba(0,200,100,0.18)" if ok else ("rgba(239,68,68,0.18)" if fail else "rgba(255,255,255,0.06)")
-        cards.append(
-            f'<div style="padding:9px 14px;background:{bg};border:1px solid {border};'
-            f'border-radius:8px;font-size:0.8rem;color:{color};line-height:1.55;margin-bottom:6px;">'
-            f'{line}</div>'
+        if not ok and not fail:
+            continue
+        text = line[1:].strip()  # strip emoji
+
+        # Override: if the line claims ✅ but contains a SHORTFALL keyword, mark ❌
+        if ok and re.search(r"SHORTFALL|shortfall|❌", text, re.IGNORECASE):
+            ok, fail = False, True
+
+        color  = "#34d399" if ok else "#f87171"
+        bg     = "rgba(0,200,100,0.07)" if ok else "rgba(239,68,68,0.07)"
+        border = "rgba(0,200,100,0.2)" if ok else "rgba(239,68,68,0.2)"
+        icon   = "✅" if ok else "❌"
+        chips.append(
+            f'<span style="display:inline-flex;align-items:center;gap:5px;'
+            f'padding:4px 10px;background:{bg};border:1px solid {border};'
+            f'border-radius:20px;font-size:0.72rem;color:{color};white-space:nowrap;">'
+            f'{icon} {text}</span>'
         )
-    return '<div style="margin-bottom:4px;">' + "".join(cards) + '</div>'
+    if not chips:
+        return ""
+    return (
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;'
+        'margin:2px 0 14px 0;padding:10px 14px;'
+        'background:rgba(255,255,255,0.02);border-radius:10px;'
+        'border:1px solid rgba(255,255,255,0.05);">'
+        + "".join(chips) + "</div>"
+    )
 
 
 def _render_transfer_cards_html(content: str) -> str:
@@ -1290,10 +1534,11 @@ def _analysis_text_block(lines: list[str]) -> str:
 
 
 _DASH_SECTION_RE = re.compile(
-    r"(?:^|\n)((?:🔍|📝|📋|📊|💡)[^\n]*)\n",
+    r"(?:^|\n)((?:🔍|📝|📋|📊|💡|🎯)[^\n]*)\n",
     re.MULTILINE,
 )
 _DASH_EMOJI_MAP = {
+    "🎯": "strategy_overview",
     "🔍": "reality_checks",
     "📝": "transfer_summary",
     "📋": "lineup",
@@ -1303,7 +1548,7 @@ _DASH_EMOJI_MAP = {
 
 
 def _is_dashboard_output(text: str) -> bool:
-    return any(h in text for h in ("🔍 REALITY", "📝 TRANSFER SUMMARY", "📊 STARTING XI"))
+    return any(h in text for h in ("🔍 REALITY", "📝 TRANSFER SUMMARY", "📊 STARTING XI", "🎯 STRATEGY"))
 
 
 _DIVIDER_RE = re.compile(r"^[━─=\-]{3,}\s*$", re.MULTILINE)
@@ -1316,9 +1561,14 @@ def _clean_section(text: str) -> str:
 
 def _split_dashboard_sections(text: str) -> list[tuple[str, str]]:
     boundaries = []
-    for m in re.finditer(r"(?:^|\n)((?:🔍|📝|📋|📊|💡)[^\n]*)", text, re.MULTILINE):
-        emoji = m.group(1).strip()[0]
-        sec   = _DASH_EMOJI_MAP.get(emoji, "other")
+    for m in re.finditer(r"(?:^|\n)((?:🔍|📝|📋|📊|💡|🎯)[^\n]*)", text, re.MULTILINE):
+        header = m.group(1).strip()
+        emoji  = header[0]
+        # 📋 can appear inside the analysis section as "📋 FORMATION:" — only treat
+        # it as a top-level section boundary when the line mentions "LINEUP"
+        if emoji == "📋" and "lineup" not in header.lower():
+            continue
+        sec = _DASH_EMOJI_MAP.get(emoji, "other")
         boundaries.append((m.start(1), m.end(), sec))
 
     if not boundaries:
@@ -1360,9 +1610,26 @@ def _render_final_output(raw_text: str, lineup: dict | None = None):
 
     for sec_type, content in sections:
 
-        # ── Reality Checks ──────────────────────────────────────────
-        if sec_type == "reality_checks":
-            _render_section_header("🔍  Reality checks", "#3a7a5a")
+        # ── Strategy Overview (executive summary card) ────────────────
+        if sec_type == "strategy_overview":
+            # Strip divider lines and STRATEGY OVERVIEW header remnants
+            body = re.sub(r'^[━─=\-]{3,}\s*$', '', content, flags=re.MULTILINE)
+            body = re.sub(r'(?i)^\s*strategy\s+overview\s*$', '', body, flags=re.MULTILINE).strip()
+            if body:
+                st.markdown(f"""
+<div style="margin:8px 0 20px;padding:20px 24px;
+            background:linear-gradient(135deg, rgba(0,232,122,0.04) 0%, rgba(0,180,100,0.015) 100%);
+            border:1px solid rgba(0,232,122,0.1);border-radius:14px;
+            border-left:3px solid rgba(0,232,122,0.35);">
+  <div style="font-size:0.58rem;font-weight:800;letter-spacing:0.14em;
+              text-transform:uppercase;color:#00e87a;margin-bottom:10px;
+              opacity:0.8;">Strategy Overview</div>
+  <div style="font-size:0.84rem;color:#c8c8d8;line-height:1.75;
+              font-weight:400;">{body}</div>
+</div>""", unsafe_allow_html=True)
+
+        # ── Reality Checks (compact chip strip — no section header) ──
+        elif sec_type == "reality_checks":
             html = _render_checks_html(content)
             if html:
                 st.markdown(html, unsafe_allow_html=True)
@@ -1416,6 +1683,107 @@ def _render_final_output(raw_text: str, lineup: dict | None = None):
             st.markdown(_pitch, unsafe_allow_html=True)
 
 
+def _build_loading_html(
+    completed: list[str],
+    current: str | None,
+    last_tool: str | None = None,
+    insights: list[dict] | None = None,
+) -> str:
+    """Render a live pipeline-progress view with an activity feed."""
+    insights = insights or []
+
+    # ── Active agent banner with description ─────────────────────────────────
+    if current:
+        cur_label = AGENT_LABELS.get(current, current)
+        cur_icon  = AGENT_ICONS.get(current, "⚙️")
+        cur_desc  = AGENT_DESCRIPTIONS.get(current, "Working…")
+        banner = f"""
+<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;
+            background:linear-gradient(135deg, rgba(0,232,122,0.07) 0%, rgba(0,180,100,0.03) 100%);
+            border:1px solid rgba(0,232,122,0.16);
+            border-radius:12px;margin-bottom:14px;">
+  <div style="position:relative;width:32px;height:32px;flex-shrink:0;">
+    <div style="position:absolute;inset:0;border-radius:50%;
+                border:2px solid transparent;border-top-color:#00e87a;
+                animation:agent-spin 1s linear infinite;"></div>
+    <div style="position:absolute;inset:4px;display:flex;align-items:center;justify-content:center;
+                font-size:0.85rem;">{cur_icon}</div>
+  </div>
+  <div style="flex:1;min-width:0;">
+    <div style="font-size:0.72rem;font-weight:700;color:#00e87a;
+                letter-spacing:0.06em;text-transform:uppercase;line-height:1.2;">{cur_label}</div>
+    <div style="font-size:0.65rem;color:#4a4a62;font-weight:400;
+                margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{cur_desc}</div>
+  </div>
+</div>"""
+    else:
+        banner = ""
+
+    # ── Completed agent chips ────────────────────────────────────────────────
+    chips = ""
+    for ag in completed[-8:]:
+        lbl  = AGENT_LABELS.get(ag, ag)
+        icon = AGENT_ICONS.get(ag, "✓")
+        chips += f"""<div style="display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;background:rgba(255,255,255,0.02);
+  border:1px solid rgba(255,255,255,0.06);border-radius:20px;">
+  <span style="font-size:0.6rem;opacity:0.5;">{icon}</span>
+  <span style="font-size:0.64rem;color:#3a3a52;font-weight:500;white-space:nowrap;">{lbl}</span>
+</div>"""
+
+    chips_row = (
+        f'<div style="display:flex;flex-wrap:wrap;gap:5px;padding:0 1px;">{chips}</div>'
+        if chips else ""
+    )
+
+    # ── Live activity feed (insights from tool results) ──────────────────────
+    feed_html = ""
+    if insights:
+        feed_items = ""
+        for i, ins in enumerate(insights[-6:]):  # show last 6 insights
+            icon  = AGENT_ICONS.get(ins.get("agent", ""), "💡")
+            label = AGENT_LABELS.get(ins.get("agent", ""), "")
+            text  = ins.get("text", "")
+            # Fade older items
+            opacity = max(0.4, 1.0 - (len(insights[-6:]) - 1 - i) * 0.12)
+            feed_items += f"""
+<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 12px;
+            border-left:2px solid rgba(0,232,122,0.2);
+            animation:feed-slide-in 0.3s ease-out;opacity:{opacity};">
+  <span style="font-size:0.62rem;flex-shrink:0;margin-top:1px;">{icon}</span>
+  <div style="flex:1;min-width:0;">
+    <span style="font-size:0.58rem;font-weight:600;color:#00e87a;
+                 letter-spacing:0.04em;text-transform:uppercase;opacity:0.7;">{label}</span>
+    <div style="font-size:0.66rem;color:#7a7a92;font-weight:400;margin-top:1px;
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                line-height:1.4;">{text}</div>
+  </div>
+</div>"""
+
+        feed_html = f"""
+<div style="margin-top:12px;display:flex;flex-direction:column;gap:2px;
+            background:rgba(0,0,0,0.15);border-radius:8px;padding:6px 0;
+            max-height:200px;overflow-y:auto;">
+  <div style="padding:0 12px 4px;font-size:0.55rem;font-weight:700;
+              letter-spacing:0.1em;text-transform:uppercase;color:#1e1e2e;">Live Activity</div>
+  {feed_items}
+</div>"""
+
+    # ── Last tool call (subtle) ──────────────────────────────────────────────
+    tool_row = ""
+    if last_tool:
+        tool_row = f"""
+<div style="margin-top:10px;padding:5px 10px;background:rgba(0,0,0,0.18);
+            border-radius:6px;overflow:hidden;">
+  <span style="font-family:'JetBrains Mono','Fira Code',monospace;
+               font-size:0.58rem;color:#1a1a28;letter-spacing:-0.01em;
+               white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+               display:block;">{last_tool}</span>
+</div>"""
+
+    return f'<div style="padding:4px 0 2px;">{banner}{chips_row}{feed_html}{tool_row}</div>'
+
+
 def _current_gw(fpl_data) -> int:
     try:
         events = pd.DataFrame(fpl_data["events"])
@@ -1432,19 +1800,42 @@ def _current_gw(fpl_data) -> int:
 
 # ── Helper: re-render saved agent trace ───────────────────────────────────────
 def render_log(log: list):
+    """Render a completed agent trace as a tidy pipeline summary."""
+    # Collect unique agent names in order, plus tool call counts per agent
+    seen: dict[str, int] = {}
     for entry in log:
-        t     = entry["type"]
-        agent = AGENT_LABELS.get(entry.get("agent", ""), entry.get("agent", ""))
-        if t == "agent_start":
-            st.markdown(f'<div class="feed-agent">▶ {agent}</div>', unsafe_allow_html=True)
-        elif t == "tool_call":
-            args_str = ", ".join(f"{k}={v}" for k, v in entry.get("args", {}).items())
-            st.markdown(f'<div class="feed-tool">🔧 {entry["name"]}({args_str})</div>', unsafe_allow_html=True)
-        elif t == "tool_result":
-            preview = entry.get("content", "")[:300].replace("\n", " ")
-            st.markdown(f'<div class="feed-result">↳ {preview}…</div>', unsafe_allow_html=True)
-        elif t == "agent_text":
-            st.markdown(f'<div class="feed-text">{entry["content"]}</div>', unsafe_allow_html=True)
+        ag = entry.get("agent", "")
+        if not ag:
+            continue
+        if entry["type"] == "agent_start":
+            if ag not in seen:
+                seen[ag] = 0
+        elif entry["type"] == "tool_call":
+            seen[ag] = seen.get(ag, 0) + 1
+
+    if not seen:
+        return
+
+    chips = ""
+    for ag, tool_count in seen.items():
+        lbl   = AGENT_LABELS.get(ag, ag)
+        badge = (
+            f'<span style="background:rgba(0,232,122,0.08);color:#00e87a;'
+            f'font-size:0.57rem;font-weight:700;padding:1px 5px;border-radius:3px;'
+            f'margin-left:5px;">{tool_count}</span>'
+            if tool_count else ""
+        )
+        chips += f"""<div style="display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;background:rgba(255,255,255,0.02);
+  border:1px solid rgba(255,255,255,0.06);border-radius:20px;">
+  <div style="width:4px;height:4px;border-radius:50%;background:#00e87a;opacity:0.5;"></div>
+  <span style="font-size:0.66rem;color:#3a3a52;font-weight:500;">{lbl}</span>{badge}
+</div>"""
+
+    st.markdown(
+        f'<div style="display:flex;flex-wrap:wrap;gap:5px;padding:4px 0;">{chips}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 # ── Clarification card renderer ────────────────────────────────────────────────
@@ -1716,13 +2107,37 @@ if _user_input:
     from agent import clear_tool_cache
     clear_tool_cache()
 
+    # Use a fresh thread_id for every query so InMemorySaver starts with a clean
+    # message slate. Reusing the same thread accumulates all prior run messages,
+    # which pollutes downstream agent contexts with failure outputs from retries.
+    import uuid as _uuid
+    _run_thread_id = str(_uuid.uuid4())
+
     _config = {
-        "configurable": {"thread_id": st.session_state.thread_id},
+        "configurable": {"thread_id": _run_thread_id},
         "recursion_limit": 150,
     }
 
     with st.chat_message("assistant"):
-        with st.status("Agents working…", expanded=True) as _status:
+        with st.status("Analysing your squad…", expanded=True) as _status:
+            _progress_slot = st.empty()
+            _completed_agents: list[str] = []
+            _current_agent_node: str | None = None
+            _last_tool_str: str | None = None
+            _live_insights: list[dict] = []
+            _last_tool_name: str | None = None
+
+            def _refresh_progress():
+                _progress_slot.markdown(
+                    _build_loading_html(
+                        _completed_agents, _current_agent_node,
+                        _last_tool_str, _live_insights,
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+            _refresh_progress()
+
             try:
                 for _chunk in model.stream(
                     {"messages": [{"role": "user", "content": _full_message}]},
@@ -1732,14 +2147,15 @@ if _user_input:
                         if _node.startswith("__") or not isinstance(_node_data, dict) or _node in _INTERNAL_NODES:
                             continue
 
-                        _label = AGENT_LABELS.get(_node, _node)
-
                         if _node != _last_agent:
+                            # Previous agent just finished
+                            if _last_agent and _last_agent not in _completed_agents:
+                                _completed_agents.append(_last_agent)
                             _last_agent = _node
+                            _current_agent_node = _node
                             _app_log.info("AGENT  %s", _node)
-                            st.markdown(f'<div class="feed-agent">▶ {_label}</div>', unsafe_allow_html=True)
                             _log.append({"type": "agent_start", "agent": _node})
-                            _status.update(label=f"⚙ {_label}…")
+                            _refresh_progress()
 
                         for _msg in _node_data.get("messages", []):
                             if isinstance(_msg, AIMessage) and getattr(_msg, "tool_calls", None):
@@ -1748,38 +2164,52 @@ if _user_input:
                                         f"{k}={repr(v)}" for k, v in _tc.get("args", {}).items()
                                     )
                                     _app_log.info("  TOOL  %s(%s)", _tc["name"], _args_str)
-                                    st.markdown(
-                                        f'<div class="feed-tool">🔧 {_tc["name"]}({_args_str})</div>',
-                                        unsafe_allow_html=True,
-                                    )
+                                    _last_tool_str = f"{_tc['name']}({_args_str[:80]})"
+                                    _last_tool_name = _tc["name"]
                                     _log.append({
                                         "type": "tool_call", "agent": _node,
                                         "name": _tc["name"], "args": _tc.get("args", {}),
                                     })
+                                    _refresh_progress()
 
                             elif isinstance(_msg, ToolMessage):
-                                _raw     = _msg.content if isinstance(_msg.content, str) else str(_msg.content)
-                                _preview = _raw[:300].replace("\n", " ")
-                                _ell     = "…" if len(_raw) > 300 else ""
+                                _raw = _msg.content if isinstance(_msg.content, str) else str(_msg.content)
                                 _app_log.debug("  RESULT %s…", _raw[:200].replace("\n", " "))
-                                st.markdown(
-                                    f'<div class="feed-result">↳ {_preview}{_ell}</div>',
-                                    unsafe_allow_html=True,
-                                )
                                 _log.append({"type": "tool_result", "agent": _node, "content": _raw})
+
+                                # Extract insight from tool result for live feed
+                                _insight = _extract_insight(
+                                    _last_tool_name or "", _raw, _node
+                                )
+                                if _insight:
+                                    _live_insights.append({
+                                        "agent": _node,
+                                        "text": _insight,
+                                    })
+                                    _refresh_progress()
 
                             elif isinstance(_msg, AIMessage):
                                 _content = _msg.content if isinstance(_msg.content, str) else ""
                                 if not _content.strip():
                                     continue
                                 _app_log.info("  TEXT  [%s] %s…", _node, _content[:120].replace("\n", " "))
-                                st.markdown(
-                                    f'<div class="feed-text">{_content}</div>',
-                                    unsafe_allow_html=True,
-                                )
                                 _log.append({"type": "agent_text", "agent": _node, "content": _content})
                                 if _node == "final_reviewer":
                                     _final_out = _content
+
+                                # Extract insight from deterministic nodes (constraint_validator)
+                                if _node == "constraint_validator":
+                                    if "VALIDATION PASSED" in _content:
+                                        _live_insights.append({"agent": _node, "text": "✅ All checks passed — budget, club limits, composition"})
+                                    elif "VALIDATION FAILED" in _content:
+                                        # Extract first issue line
+                                        for _line in _content.split("\n"):
+                                            if _line.strip().startswith("1."):
+                                                _live_insights.append({"agent": _node, "text": f"❌ {_line.strip()[2:].strip()}"})
+                                                break
+                                        else:
+                                            _live_insights.append({"agent": _node, "text": "❌ Validation failed — see issues"})
+                                    _refresh_progress()
 
             except Exception as _e:
                 import traceback
@@ -1793,6 +2223,10 @@ if _user_input:
                 })
                 st.stop()
 
+            # Mark final agent as completed and clear progress slot
+            if _last_agent and _last_agent not in _completed_agents:
+                _completed_agents.append(_last_agent)
+            _progress_slot.empty()
             _status.update(label="✅ Done", state="complete", expanded=False)
 
         # Fall back to last agent text if final_reviewer didn't produce output
